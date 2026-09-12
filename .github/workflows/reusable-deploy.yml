@@ -65,8 +65,9 @@ jobs:
           fi
 
           kind="$(python3 -c "import os,yaml;print(yaml.safe_load(open(f\"projects/{os.environ['SLUG']}.yml\"))['deploy']['kind'])")"
-          if [ "$kind" = "none" ]; then
-            echo "Registry entry declares kind: none; nothing to record."
+          if [ "$kind" != "compose" ]; then
+            echo "Registry entry declares kind: ${kind}, which does not run container images."
+            echo "Nothing to record."
             exit 0
           fi
 
