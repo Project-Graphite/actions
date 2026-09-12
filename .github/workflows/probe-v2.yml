@@ -1,0 +1,16 @@
+name: v2 permissions
+on:
+  workflow_call:
+    inputs:
+      services: { type: string, required: true }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: ${{ fromJSON(inputs.services) }}
+    steps:
+      - run: echo "${{ matrix.service }}"
