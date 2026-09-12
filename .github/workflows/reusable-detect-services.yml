@@ -31,26 +31,29 @@ jobs:
         run: |
           set -euo pipefail
 
-          known="$(git ls-files -- '*/Dockerfile' | grep -E '^[^/]+/Dockerfile$' | cut -d/ -f1 | sort -u || true)"
+          mapfile -t known < <(
+            git ls-files -- '*/Dockerfile' | grep -E '^[^/]+/Dockerfile$' | cut -d/ -f1 | sort -u
+          )
 
-          if [ -z "$known" ]; then
+          if [ "${#known[@]}" -eq 0 ]; then
             echo "services=[]" >> "$GITHUB_OUTPUT"
             echo "any=false" >> "$GITHUB_OUTPUT"
             echo "No top-level folder contains a Dockerfile."
             exit 0
           fi
 
+          selected=()
           if [ "$BUILD_ALL" = "true" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            selected="$known"
+            selected=("${known[@]}")
           else
-            selected="$(for service in $known; do
-              git diff --quiet "$BASE_SHA" HEAD -- "$service" || echo "$service"
-            done)"
+            for service in "${known[@]}"; do
+              git diff --quiet "$BASE_SHA" HEAD -- "$service" || selected+=("$service")
+            done
           fi
 
-          services="$(printf '%s\n' $selected | jq -R . | jq -sc 'map(select(length > 0))')"
+          services="$(jq -nc '$ARGS.positional' --args "${selected[@]}")"
           echo "services=$services" >> "$GITHUB_OUTPUT"
-          echo "any=$([ "$services" = '[]' ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+          echo "any=$([ "${#selected[@]}" -eq 0 ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
 
-          echo "Known services: $(echo $known | tr '\n' ' ')"
+          echo "Known services: ${known[*]}"
           echo "Selected: $services"
