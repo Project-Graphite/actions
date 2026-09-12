@@ -123,3 +123,27 @@ every repository at once.
 
 See [project-template](https://github.com/project-graphite/project-template) for the two files
 every project repository needs.
+
+## Permissions
+
+The organisation leaves `GITHUB_TOKEN` read-only by default. A reusable workflow cannot request
+more than its caller grants, so jobs that call a workflow needing write access must grant it at
+the call site:
+
+```yaml
+  build:
+    permissions:
+      contents: read
+      packages: write
+    uses: project-graphite/actions/.github/workflows/reusable-docker-build-push.yml@v1
+```
+
+| Calling a workflow that | Grant |
+| :--- | :--- |
+| pushes images (`reusable-docker-build-push`) | `contents: read`, `packages: write` |
+| labels pull requests (`reusable-pr-checks`) | `contents: read`, `issues: write`, `pull-requests: write` |
+| anything else | nothing; the read-only default is enough |
+
+Without the grant the run fails at startup with no job log, which is an unhelpful error for a
+misleading cause. Widening the organisation default to read-write would also fix it, and is the
+wrong trade: every workflow in every repository would get write access it does not need.
