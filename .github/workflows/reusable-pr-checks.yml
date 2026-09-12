@@ -1,0 +1,87 @@
+name: PR Checks
+
+on:
+  workflow_call:
+    inputs:
+      xs-max:
+        type: number
+        default: 10
+      s-max:
+        type: number
+        default: 50
+      m-max:
+        type: number
+        default: 200
+      l-max:
+        type: number
+        default: 600
+
+jobs:
+  title:
+    name: Title
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pattern='^(feat|fix|chore|refactor|docs|test|ci|perf|revert|style|build)(\([a-z0-9._/-]+\))?!?: .+'
+          if [[ ! "$TITLE" =~ $pattern ]]; then
+            echo "::error::PR title must read 'type(scope): summary'"
+            echo "Allowed types: feat fix chore refactor docs test ci perf revert style build"
+            echo "Got: $TITLE"
+            exit 1
+          fi
+
+  size:
+    name: Size
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          XS_MAX: ${{ inputs.xs-max }}
+          S_MAX: ${{ inputs.s-max }}
+          M_MAX: ${{ inputs.m-max }}
+          L_MAX: ${{ inputs.l-max }}
+        run: |
+          set -euo pipefail
+
+          lockfiles='(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|poetry\.lock|uv\.lock|Cargo\.lock|go\.sum)$'
+          changed="$(gh api "repos/${GH_REPO}/pulls/${PR}/files" --paginate \
+            --jq "[.[] | select(.filename | test(\"${lockfiles}\") | not) | .additions + .deletions] | add // 0")"
+
+          if   [ "$changed" -le "$XS_MAX" ]; then bucket=xs; color=0E8A16
+          elif [ "$changed" -le "$S_MAX"  ]; then bucket=s;  color=0E8A16
+          elif [ "$changed" -le "$M_MAX"  ]; then bucket=m;  color=FBCA04
+          elif [ "$changed" -le "$L_MAX"  ]; then bucket=l;  color=D93F0B
+          else                                    bucket=xl; color=B60205
+          fi
+
+          echo "${changed} changed lines excluding lockfiles -> size/${bucket}"
+
+          gh label create "size/${bucket}" --color "$color" --description "${changed} lines is a ${bucket} pull request" --force
+
+          applied="$(gh pr view "$PR" --json labels --jq '.labels[].name | select(startswith("size/"))')"
+          for label in $applied; do
+            [ "$label" = "size/${bucket}" ] || gh pr edit "$PR" --remove-label "$label"
+          done
+          gh pr edit "$PR" --add-label "size/${bucket}"
+
+  paths:
+    name: Paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/labeler@v7
+        if: hashFiles('.github/labeler.yml') != ''
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

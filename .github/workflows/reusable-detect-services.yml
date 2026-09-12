@@ -1,0 +1,56 @@
+name: Detect Services
+
+on:
+  workflow_call:
+    inputs:
+      all:
+        type: boolean
+        default: false
+    outputs:
+      services:
+        value: ${{ jobs.detect.outputs.services }}
+      any:
+        value: ${{ jobs.detect.outputs.any }}
+
+jobs:
+  detect:
+    name: Detect
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.scan.outputs.services }}
+      any: ${{ steps.scan.outputs.any }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: scan
+        env:
+          BUILD_ALL: ${{ inputs.all }}
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+
+          known="$(git ls-files -- '*/Dockerfile' | grep -E '^[^/]+/Dockerfile$' | cut -d/ -f1 | sort -u || true)"
+
+          if [ -z "$known" ]; then
+            echo "services=[]" >> "$GITHUB_OUTPUT"
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo "No top-level folder contains a Dockerfile."
+            exit 0
+          fi
+
+          if [ "$BUILD_ALL" = "true" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            selected="$known"
+          else
+            selected="$(for service in $known; do
+              git diff --quiet "$BASE_SHA" HEAD -- "$service" || echo "$service"
+            done)"
+          fi
+
+          services="$(printf '%s\n' $selected | jq -R . | jq -sc 'map(select(length > 0))')"
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+          echo "any=$([ "$services" = '[]' ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+
+          echo "Known services: $(echo $known | tr '\n' ' ')"
+          echo "Selected: $services"

@@ -1,0 +1,84 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      services:
+        type: string
+        required: true
+      tag:
+        type: string
+        required: true
+    secrets:
+      PLATFORM_APP_ID:
+        required: true
+      PLATFORM_APP_PRIVATE_KEY:
+        required: true
+
+jobs:
+  record:
+    name: Record
+    if: ${{ inputs.services != '[]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ secrets.PLATFORM_APP_ID }}
+          private-key: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: platform
+
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/platform
+          token: ${{ steps.app-token.outputs.token }}
+
+      - env:
+          SERVICES: ${{ inputs.services }}
+          TAG: ${{ inputs.tag }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+
+          slug="$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')"
+          export SLUG="$slug"
+
+          if [ ! -f "projects/${slug}.yml" ]; then
+            echo "::error::No registry entry at projects/${slug}.yml in the platform repo."
+            echo "Open a PR adding it before this repo can deploy."
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import json, os, pathlib
+
+          path = pathlib.Path("tags") / f"{os.environ['SLUG']}.json"
+          path.parent.mkdir(exist_ok=True)
+          tags = json.loads(path.read_text()) if path.exists() else {}
+          tags.update(dict.fromkeys(json.loads(os.environ["SERVICES"]), os.environ["TAG"]))
+          path.write_text(json.dumps(tags, indent=2, sort_keys=True) + "\n")
+          PY
+
+          git config user.name "graphite-deploy"
+          git config user.email "deploy@project-graphite.com"
+          git add "tags/${slug}.json"
+
+          if git diff --cached --quiet; then
+            echo "Tags already at ${TAG}; nothing to record."
+            exit 0
+          fi
+
+          git commit --message "chore(${slug}): deploy ${TAG}"
+
+          for attempt in 1 2 3; do
+            if git pull --rebase --quiet origin main && git push origin HEAD:main; then
+              echo "Recorded ${TAG} for ${slug}."
+              exit 0
+            fi
+            echo "Push raced with another deploy; retrying (${attempt}/3)."
+            sleep $(( attempt * 5 ))
+          done
+
+          echo "::error::Could not push tag update after 3 attempts."
+          exit 1
