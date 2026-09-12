@@ -11,30 +11,36 @@ on:
         default: true
     outputs:
       tag:
-        value: ${{ jobs.build.outputs.tag }}
+        value: ${{ jobs.meta.outputs.tag }}
 
 jobs:
+  meta:
+    name: Tag
+    if: ${{ inputs.services != '[]' }}
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.compute.outputs.tag }}
+      image: ${{ steps.compute.outputs.image }}
+    steps:
+      - id: compute
+        run: |
+          set -euo pipefail
+          echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
   build:
     name: ${{ matrix.service }}
-    if: ${{ inputs.services != '[]' }}
+    needs: meta
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    outputs:
-      tag: ${{ steps.meta.outputs.tag }}
     strategy:
       fail-fast: false
       matrix:
         service: ${{ fromJSON(inputs.services) }}
     steps:
       - uses: actions/checkout@v7
-
-      - id: meta
-        run: |
-          set -euo pipefail
-          echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          echo "image=ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')/${{ matrix.service }}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v4
 
@@ -51,7 +57,7 @@ jobs:
           push: ${{ inputs.push }}
           provenance: false
           tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
-            ${{ steps.meta.outputs.image }}:latest
+            ${{ needs.meta.outputs.image }}/${{ matrix.service }}:${{ needs.meta.outputs.tag }}
+            ${{ needs.meta.outputs.image }}/${{ matrix.service }}:latest
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
