@@ -52,7 +52,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          lockfiles='(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|poetry\.lock|uv\.lock|Cargo\.lock|go\.sum)$'
+          lockfiles='(package-lock[.]json|pnpm-lock[.]yaml|yarn[.]lock|poetry[.]lock|uv[.]lock|Cargo[.]lock|go[.]sum)$'
           changed="$(gh api "repos/${GH_REPO}/pulls/${PR}/files" --paginate \
             --jq "[.[] | select(.filename | test(\"${lockfiles}\") | not) | .additions + .deletions] | add // 0")"
 
