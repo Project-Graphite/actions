@@ -11,9 +11,9 @@ on:
         required: true
     secrets:
       PLATFORM_APP_ID:
-        required: true
+        required: false
       PLATFORM_APP_PRIVATE_KEY:
-        required: true
+        required: false
 
 jobs:
   record:
@@ -21,6 +21,19 @@ jobs:
     if: ${{ inputs.services != '[]' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Require the deploy app
+        env:
+          APP_ID: ${{ secrets.PLATFORM_APP_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "$APP_ID" ]; then
+            echo "::error::PLATFORM_APP_ID and PLATFORM_APP_PRIVATE_KEY are not set for this organisation."
+            echo "Create the Graphite Deploy GitHub App, install it on the platform repository,"
+            echo "and add both as organisation secrets. Images were built and pushed; only the"
+            echo "record step is blocked."
+            exit 1
+          fi
+
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
@@ -34,20 +47,27 @@ jobs:
           repository: ${{ github.repository_owner }}/platform
           token: ${{ steps.app-token.outputs.token }}
 
-      - env:
+      - name: Record image tags
+        env:
           SERVICES: ${{ inputs.services }}
           TAG: ${{ inputs.tag }}
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
 
-          slug="$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')"
-          export SLUG="$slug"
+          SLUG="$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')"
+          export SLUG
 
-          if [ ! -f "projects/${slug}.yml" ]; then
-            echo "::error::No registry entry at projects/${slug}.yml in the platform repo."
-            echo "Open a PR adding it before this repo can deploy."
+          if [ ! -f "projects/${SLUG}.yml" ]; then
+            echo "::error::No registry entry at projects/${SLUG}.yml in the platform repository."
+            echo "Open a pull request adding it before this repository can deploy."
             exit 1
+          fi
+
+          kind="$(python3 -c "import os,yaml;print(yaml.safe_load(open(f\"projects/{os.environ['SLUG']}.yml\"))['deploy']['kind'])")"
+          if [ "$kind" = "none" ]; then
+            echo "Registry entry declares kind: none; nothing to record."
+            exit 0
           fi
 
           python3 - <<'PY'
@@ -62,23 +82,23 @@ jobs:
 
           git config user.name "graphite-deploy"
           git config user.email "deploy@project-graphite.com"
-          git add "tags/${slug}.json"
+          git add "tags/${SLUG}.json"
 
           if git diff --cached --quiet; then
             echo "Tags already at ${TAG}; nothing to record."
             exit 0
           fi
 
-          git commit --message "chore(${slug}): deploy ${TAG}"
+          git commit --message "chore(${SLUG}): deploy ${TAG}"
 
           for attempt in 1 2 3; do
             if git pull --rebase --quiet origin main && git push origin HEAD:main; then
-              echo "Recorded ${TAG} for ${slug}."
+              echo "Recorded ${TAG} for ${SLUG}."
               exit 0
             fi
             echo "Push raced with another deploy; retrying (${attempt}/3)."
             sleep $(( attempt * 5 ))
           done
 
-          echo "::error::Could not push tag update after 3 attempts."
+          echo "::error::Could not push the tag update after 3 attempts."
           exit 1
