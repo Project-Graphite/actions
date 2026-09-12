@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install actionlint
+        env:
+          VERSION: 1.7.12
+        run: |
+          set -euo pipefail
+          curl -sSfL "https://github.com/rhysd/actionlint/releases/download/v${VERSION}/actionlint_${VERSION}_linux_amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin actionlint
+
+      - name: Lint every workflow
+        run: actionlint -color
+
+      - name: Check every action reference is pinned to a major version
+        run: |
+          set -euo pipefail
+          unpinned="$(grep -rhoE 'uses: [a-zA-Z0-9._-]+/[a-zA-Z0-9._/-]+@[^ ]+' .github/workflows \
+            | grep -vE '@v[0-9]+$' || true)"
+          if [ -n "$unpinned" ]; then
+            echo "::error::Every action must be pinned to a major version tag."
+            echo "$unpinned"
+            exit 1
+          fi
+          echo "All action references are pinned."
+
+  secrets:
+    name: Secrets
+    uses: ./.github/workflows/reusable-gitleaks.yml
