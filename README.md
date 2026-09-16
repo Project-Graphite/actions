@@ -78,8 +78,8 @@ per service, so one service rebuilding does not invalidate another.
 | Inputs | `services` (required), `tag` (required) |
 | Secrets | `PLATFORM_APP_ID`, `PLATFORM_APP_PRIVATE_KEY` |
 
-Merges the new tags into `tags/<slug>.json` in the `platform` repository and pushes. The platform
-workflow validates the registry and renders the resulting Kubernetes resources for review.
+Merges the new tags into `tags/<slug>.json` in the `platform` repository and pushes. This records
+the deployable release for review; it does not contact Coolify or mutate the VPS.
 
 It fails if `projects/<slug>.yml` does not exist in `platform` — a repository cannot deploy until
 it has a registry entry.
