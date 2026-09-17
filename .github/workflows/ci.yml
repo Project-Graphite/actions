@@ -25,7 +25,10 @@ jobs:
             | sudo tar -xz -C /usr/local/bin actionlint
 
       - name: Lint every workflow
-        run: actionlint -color
+        run: >-
+          actionlint -color
+          -ignore 'missing input "app-id" which is required by action "actions/create-github-app-token@v3"'
+          -ignore 'input "client-id" is not defined in action "actions/create-github-app-token@v3"'
 
       - name: Check every action reference is pinned to a major version
         run: |
