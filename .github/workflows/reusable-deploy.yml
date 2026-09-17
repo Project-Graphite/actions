@@ -10,7 +10,7 @@ on:
         type: string
         required: true
     secrets:
-      PLATFORM_APP_ID:
+      PLATFORM_APP_CLIENT_ID:
         required: false
       PLATFORM_APP_PRIVATE_KEY:
         required: false
@@ -23,11 +23,11 @@ jobs:
     steps:
       - name: Require the deploy app
         env:
-          APP_ID: ${{ secrets.PLATFORM_APP_ID }}
+          CLIENT_ID: ${{ secrets.PLATFORM_APP_CLIENT_ID }}
         run: |
           set -euo pipefail
-          if [ -z "$APP_ID" ]; then
-            echo "::error::PLATFORM_APP_ID and PLATFORM_APP_PRIVATE_KEY are not set for this organisation."
+          if [ -z "$CLIENT_ID" ]; then
+            echo "::error::PLATFORM_APP_CLIENT_ID and PLATFORM_APP_PRIVATE_KEY are not set for this organisation."
             echo "Create the Graphite Deploy GitHub App, install it on the platform repository,"
             echo "and add both as organisation secrets. Images were built and pushed; only the"
             echo "record step is blocked."
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
-          app-id: ${{ secrets.PLATFORM_APP_ID }}
+          client-id: ${{ secrets.PLATFORM_APP_CLIENT_ID }}
           private-key: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: platform
