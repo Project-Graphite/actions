@@ -44,6 +44,7 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 | `reusable-deploy.yml` | Record the new image tags in the `platform` repository |
 | `reusable-pr-checks.yml` | Conventional PR title, diff-size label, path labels |
 | `reusable-gitleaks.yml` | Scan full history for committed secrets |
+| `reusable-sync-registry.yml` | Ask the `platform` registry to resync this repository's manifest |
 
 ### reusable-detect-services
 
@@ -106,6 +107,20 @@ Path labels apply only if the calling repository has a `.github/labeler.yml`.
 
 Runs the pinned release binary against full history. The `gitleaks-action` marketplace action needs
 a paid licence key for organisation repositories; the binary does not.
+
+### reusable-sync-registry
+
+| | |
+| :--- | :--- |
+| Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY` |
+
+Sends a `sync-registry` repository dispatch to `platform`, which rereads every `.graphite.yml` in
+the organisation. Call it on pushes to `main` that touch `.graphite.yml`; the registry also runs a
+daily reconcile for repositories that never call it and for repositories that were renamed,
+archived or removed.
+
+It dispatches rather than calling the registry workflow directly because the deploy app holds
+`contents: write` but not `actions: write`.
 
 ## Versioning
 
