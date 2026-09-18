@@ -109,15 +109,17 @@ a paid licence key for organisation repositories; the binary does not.
 
 ## Versioning
 
-Call these workflows at `@v1`, never `@main`:
+Call these workflows at `@main`:
 
 ```yaml
-uses: project-graphite/actions/.github/workflows/reusable-checks.yml@v1
+uses: project-graphite/actions/.github/workflows/reusable-checks.yml@main
 ```
 
-`v1` moves forward with backwards-compatible changes. A breaking change gets a `v2` tag, and
-repositories move to it deliberately. Pinning to `@main` means one bad commit here breaks CI in
-every repository at once.
+There is no version tag. A moving `v1` had to be force-pushed after every change here, which is a
+step that gets forgotten, and a stale tag is harder to diagnose than a bad commit. Changes to these
+workflows go through review on this repository and reach every caller at once.
+
+A repository that needs to hold back can pin a commit SHA at the call site.
 
 ## Calling them
 
@@ -135,7 +137,7 @@ the call site:
     permissions:
       contents: read
       packages: write
-    uses: project-graphite/actions/.github/workflows/reusable-docker-build-push.yml@v1
+    uses: project-graphite/actions/.github/workflows/reusable-docker-build-push.yml@main
 ```
 
 | Calling a workflow that | Grant |
