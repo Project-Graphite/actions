@@ -1,0 +1,25 @@
+name: Sync registry
+
+on:
+  workflow_call:
+
+jobs:
+  dispatch:
+    name: Request registry sync
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ secrets.PLATFORM_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: platform
+
+      - name: Dispatch to the registry
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api "repos/${{ github.repository_owner }}/platform/dispatches" \
+            --field event_type=sync-registry
