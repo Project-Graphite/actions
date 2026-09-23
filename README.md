@@ -61,7 +61,7 @@ commit. When that commit is unreachable — a new branch, a force push — it se
 
 | | |
 | :--- | :--- |
-| Inputs | `services` (required), `node-version` (default `22`), `python-version` (default `3.12`) |
+| Inputs | `services` (required), `node-version` (default `24`), `python-version` (default `3.14`) |
 
 ### reusable-docker-build-push
 
