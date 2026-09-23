@@ -16,6 +16,7 @@ jobs:
           private-key: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: platform
+          permission-contents: write
 
       - name: Dispatch to the registry
         env:

@@ -32,9 +32,6 @@ jobs:
     name: ${{ matrix.service }}
     needs: meta
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     strategy:
       fail-fast: false
       matrix:

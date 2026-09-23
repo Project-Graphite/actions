@@ -41,6 +41,7 @@ jobs:
           private-key: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: platform
+          permission-contents: write
 
       - uses: actions/checkout@v7
         with:
