@@ -22,9 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - env:
-          TITLE: ${{ github.event.pull_request.title }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
+          TITLE="$(gh pr view "$PR" --json title --jq .title)"
           pattern='^(feat|fix|chore|refactor|docs|test|ci|perf|revert|style|build)(\([a-z0-9._/-]+\))?!?: .+'
           if [[ ! "$TITLE" =~ $pattern ]]; then
             echo "::error::PR title must read 'type(scope): summary'"
@@ -35,6 +38,7 @@ jobs:
 
   size:
     name: Size
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -54,18 +58,19 @@ jobs:
 
           lockfiles='(package-lock[.]json|pnpm-lock[.]yaml|yarn[.]lock|poetry[.]lock|uv[.]lock|Cargo[.]lock|go[.]sum)$'
           changed="$(gh api "repos/${GH_REPO}/pulls/${PR}/files" --paginate \
-            --jq "[.[] | select(.filename | test(\"${lockfiles}\") | not) | .additions + .deletions] | add // 0")"
+            --jq ".[] | select(.filename | test(\"${lockfiles}\") | not) | .additions + .deletions" \
+            | awk '{ total += $1 } END { print total + 0 }')"
 
-          if   [ "$changed" -le "$XS_MAX" ]; then bucket=xs; color=0E8A16
-          elif [ "$changed" -le "$S_MAX"  ]; then bucket=s;  color=0E8A16
-          elif [ "$changed" -le "$M_MAX"  ]; then bucket=m;  color=FBCA04
-          elif [ "$changed" -le "$L_MAX"  ]; then bucket=l;  color=D93F0B
-          else                                    bucket=xl; color=B60205
+          if   [ "$changed" -le "$XS_MAX" ]; then bucket=xs; color=0E8A16; range="0-${XS_MAX}"
+          elif [ "$changed" -le "$S_MAX"  ]; then bucket=s;  color=0E8A16; range="$((XS_MAX + 1))-${S_MAX}"
+          elif [ "$changed" -le "$M_MAX"  ]; then bucket=m;  color=FBCA04; range="$((S_MAX + 1))-${M_MAX}"
+          elif [ "$changed" -le "$L_MAX"  ]; then bucket=l;  color=D93F0B; range="$((M_MAX + 1))-${L_MAX}"
+          else                                    bucket=xl; color=B60205; range="Over ${L_MAX}"
           fi
 
           echo "${changed} changed lines excluding lockfiles -> size/${bucket}"
 
-          gh label create "size/${bucket}" --color "$color" --description "${changed} lines is a ${bucket} pull request" --force
+          gh label create "size/${bucket}" --color "$color" --description "${range} changed lines, excluding lockfiles" --force
 
           applied="$(gh pr view "$PR" --json labels --jq '.labels[].name | select(startswith("size/"))')"
           for label in $applied; do
@@ -75,6 +80,7 @@ jobs:
 
   paths:
     name: Paths
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read

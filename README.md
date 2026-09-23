@@ -99,6 +99,9 @@ Size counts changed lines excluding lockfiles, so a dependency bump is not label
 
 Path labels apply only if the calling repository has a `.github/labeler.yml`.
 
+Size and path labels are skipped on pull requests from forks, whose `GITHUB_TOKEN` cannot write
+labels.
+
 ### reusable-gitleaks
 
 | | |
