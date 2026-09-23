@@ -9,8 +9,6 @@ on:
     outputs:
       services:
         value: ${{ jobs.detect.outputs.services }}
-      any:
-        value: ${{ jobs.detect.outputs.any }}
 
 jobs:
   detect:
@@ -18,7 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       services: ${{ steps.scan.outputs.services }}
-      any: ${{ steps.scan.outputs.any }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -35,13 +32,6 @@ jobs:
             git ls-files -- '*/Dockerfile' | grep -E '^[^/]+/Dockerfile$' | cut -d/ -f1 | sort -u
           )
 
-          if [ "${#known[@]}" -eq 0 ]; then
-            echo "services=[]" >> "$GITHUB_OUTPUT"
-            echo "any=false" >> "$GITHUB_OUTPUT"
-            echo "No top-level folder contains a Dockerfile."
-            exit 0
-          fi
-
           selected=()
           if [ "$BUILD_ALL" = "true" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             selected=("${known[@]}")
@@ -53,7 +43,6 @@ jobs:
 
           services="$(jq -nc '$ARGS.positional' --args "${selected[@]}")"
           echo "services=$services" >> "$GITHUB_OUTPUT"
-          echo "any=$([ "${#selected[@]}" -eq 0 ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
 
           echo "Known services: ${known[*]}"
           echo "Selected: $services"

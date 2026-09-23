@@ -51,7 +51,7 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 | | |
 | :--- | :--- |
 | Inputs | `all` (boolean, default `false`) — select every service, not just changed ones |
-| Outputs | `services` — JSON array, e.g. `["frontend","server"]`<br>`any` — `"true"` or `"false"` |
+| Outputs | `services` — JSON array, e.g. `["frontend","server"]` |
 
 On a pull request it compares against the base commit. On a push it compares against the previous
 commit. When that commit is unreachable — a new branch, a force push — it selects every service.

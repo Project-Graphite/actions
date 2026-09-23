@@ -21,19 +21,6 @@ jobs:
     if: ${{ inputs.services != '[]' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Require the deploy app
-        env:
-          CLIENT_ID: ${{ secrets.PLATFORM_APP_CLIENT_ID }}
-        run: |
-          set -euo pipefail
-          if [ -z "$CLIENT_ID" ]; then
-            echo "::error::PLATFORM_APP_CLIENT_ID and PLATFORM_APP_PRIVATE_KEY are not set for this organisation."
-            echo "Create the Graphite Deploy GitHub App, install it on the platform repository,"
-            echo "and add both as organisation secrets. Images were built and pushed; only the"
-            echo "record step is blocked."
-            exit 1
-          fi
-
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
