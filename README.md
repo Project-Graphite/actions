@@ -1,9 +1,10 @@
 # actions
 
-Reusable GitHub Actions workflows shared by every repository in Project Graphite.
+Reusable GitHub Actions workflows called by Project Graphite repositories.
 
-Project repositories do not define their own CI. They call the workflows here, so the pipeline is
-defined in one place and changes to it land once.
+Project repositories call the workflows here for service detection, checks, image builds, deploy
+records, registry sync, PR conventions and secret scanning, so each step is defined in one place
+and changes to it land once.
 
 ## The service convention
 
@@ -77,10 +78,11 @@ per service, so one service rebuilding does not invalidate another.
 | | |
 | :--- | :--- |
 | Inputs | `services` (required), `tag` (required) |
-| Secrets | `PLATFORM_APP_ID`, `PLATFORM_APP_PRIVATE_KEY` |
+| Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY` |
 
-Merges the new tags into `tags/<slug>.json` in the `platform` repository and pushes. This records
-the deployable release for review; it does not contact Coolify or mutate the VPS.
+When `projects/<slug>.yml` in `platform` declares `deploy.kind: compose`, merges the new tags into
+`tags/<slug>.json` there and pushes to its `main`. Any other kind records nothing. It does not
+contact Coolify or mutate the VPS.
 
 It fails if `projects/<slug>.yml` does not exist in `platform` — a repository cannot deploy until
 it has a registry entry.
@@ -119,8 +121,7 @@ a paid licence key for organisation repositories; the binary does not.
 
 Sends a `sync-registry` repository dispatch to `platform`, which rereads every `.graphite.yml` in
 the organisation. Call it on pushes to `main` that touch `.graphite.yml`; the registry also runs a
-daily reconcile for repositories that never call it and for repositories that were renamed,
-archived or removed.
+daily reconcile for repositories that never call it and for renamed repositories.
 
 It dispatches rather than calling the registry workflow directly because the deploy app holds
 `contents: write` but not `actions: write`.
@@ -141,8 +142,8 @@ A repository that needs to hold back can pin a commit SHA at the call site.
 
 ## Calling them
 
-See [project-template](https://github.com/project-graphite/project-template) for the two files
-every project repository needs.
+See [project-template](https://github.com/project-graphite/project-template) for the workflow
+files every project repository needs: `main.yml`, `pr.yml` and `registry.yml`.
 
 ## Permissions
 
@@ -164,6 +165,7 @@ the call site:
 | labels pull requests (`reusable-pr-checks`) | `contents: read`, `issues: write`, `pull-requests: write` |
 | anything else | nothing; the read-only default is enough |
 
-Without the grant the run fails at startup with no job log, which is an unhelpful error for a
-misleading cause. Widening the organisation default to read-write would also fix it, and is the
-wrong trade: every workflow in every repository would get write access it does not need.
+Without the grant, `reusable-pr-checks` fails at startup with no job log and
+`reusable-docker-build-push` fails when it pushes. Widening the organisation default to read-write
+would also fix it, and is the wrong trade: every workflow in every repository would get write access
+it does not need.
