@@ -66,7 +66,6 @@ jobs:
         if: steps.toolchain.outputs.kind == 'make'
         with:
           python-version: ${{ inputs.python-version }}
-          cache: pip
 
       - name: Install
         if: steps.toolchain.outputs.kind == 'make'
