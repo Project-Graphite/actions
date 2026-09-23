@@ -61,7 +61,7 @@ jobs:
 
           if [ ! -f "projects/${SLUG}.yml" ]; then
             echo "::error::No registry entry at projects/${SLUG}.yml in the platform repository."
-            echo "Open a pull request adding it before this repository can deploy."
+            echo "Add an entry with slug ${SLUG} to this repository's .graphite.yml before it can deploy."
             exit 1
           fi
 
