@@ -7,8 +7,39 @@ jobs:
   dispatch:
     name: Request registry sync
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/create-github-app-token@v3
+        id: read-token
+        with:
+          client-id: ${{ secrets.PLATFORM_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/platform
+          token: ${{ steps.read-token.outputs.token }}
+          path: .platform
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - run: pip install pyyaml jsonschema
+
+      - name: Validate .graphite.yml
+        env:
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
+        run: python .platform/scripts/sync.py "${{ github.event.repository.name }}" .graphite.yml
+
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:

@@ -45,7 +45,7 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 | `reusable-deploy.yml` | Record the new image tags in the `platform` repository |
 | `reusable-pr-checks.yml` | Conventional PR title, diff-size label, path labels |
 | `reusable-gitleaks.yml` | Scan full history for committed secrets |
-| `reusable-sync-registry.yml` | Ask the `platform` registry to resync this repository's manifest |
+| `reusable-sync-registry.yml` | Validate this repository's manifest and ask the `platform` registry to resync it |
 
 ### reusable-detect-services
 
@@ -119,7 +119,9 @@ a paid licence key for organisation repositories; the binary does not.
 | :--- | :--- |
 | Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY` |
 
-Sends a `sync-registry` repository dispatch to `platform`, which rereads every `.graphite.yml` in
+Validates this repository's `.graphite.yml` with `platform`'s `scripts/sync.py`, against the
+schema and the current registry, and fails without dispatching when it is invalid. Otherwise it
+sends a `sync-registry` repository dispatch to `platform`, which rereads every `.graphite.yml` in
 the organisation. Call it on pushes to `main` that touch `.graphite.yml`; the registry also runs a
 daily reconcile for repositories that never call it and for renamed repositories.
 
