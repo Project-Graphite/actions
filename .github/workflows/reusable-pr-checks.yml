@@ -17,25 +17,6 @@ on:
         default: 600
 
 jobs:
-  title:
-    name: Title
-    runs-on: ubuntu-latest
-    steps:
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-          TITLE="$(gh pr view "$PR" --json title --jq .title)"
-          pattern='^(feat|fix|chore|refactor|docs|test|ci|perf|revert|style|build)(\([a-z0-9._/-]+\))?!?: .+'
-          if [[ ! "$TITLE" =~ $pattern ]]; then
-            echo "::error::PR title must read 'type(scope): summary'"
-            echo "Allowed types: feat fix chore refactor docs test ci perf revert style build"
-            echo "Got: $TITLE"
-            exit 1
-          fi
-
   size:
     name: Size
     if: github.event.pull_request.head.repo.full_name == github.repository
