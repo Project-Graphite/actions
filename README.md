@@ -46,6 +46,7 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 | `reusable-pr-checks.yml` | Diff-size label, path labels |
 | `reusable-gitleaks.yml` | Scan full history for committed secrets |
 | `reusable-sync-registry.yml` | Validate this repository's manifest and ask the `platform` registry to resync it |
+| `reusable-package-release.yml` | Check an npm package repository, and on a version tag publish it as a GitHub release |
 
 ### reusable-detect-services
 
@@ -124,6 +125,24 @@ daily reconcile for repositories that never call it and for renamed repositories
 It dispatches rather than calling the registry workflow directly because the deploy app holds
 `contents: write` but not `actions: write`.
 
+### reusable-package-release
+
+| | |
+| :--- | :--- |
+| Inputs | `node-version` (default `24`), `release` (boolean, default `false`) |
+
+For repositories that ship an npm package from their root instead of services, such as
+`graphite-ui`. They have no `Dockerfile`, so `reusable-detect-services` finds nothing; call this
+workflow instead.
+
+Every run does `npm ci`, then `lint` and `test` if present, then `build`. Without `release`, it lists
+the files `npm pack` would ship.
+
+With `release: true`, call it from a workflow triggered by a `v*` tag. It checks that the tag matches
+the `package.json` version, packs the package, attests the tarball's build provenance, and creates
+the GitHub release with the tarball attached. Apps install that release asset by URL, so installs
+need no registry account or token.
+
 ## Versioning
 
 Call these workflows at `@main`:
@@ -161,6 +180,7 @@ the call site:
 | :--- | :--- |
 | pushes images (`reusable-docker-build-push`) | `contents: read`, `packages: write` |
 | labels pull requests (`reusable-pr-checks`) | `contents: read`, `issues: write`, `pull-requests: write` |
+| publishes a package release (`reusable-package-release` with `release: true`) | `contents: write`, `id-token: write`, `attestations: write` |
 | anything else | nothing; the read-only default is enough |
 
 Without the grant, `reusable-pr-checks` fails at startup with no job log and
