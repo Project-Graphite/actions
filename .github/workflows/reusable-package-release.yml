@@ -1,0 +1,68 @@
+name: Package release
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        default: "24"
+      release:
+        type: boolean
+        default: false
+
+jobs:
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Test
+        run: npm run test --if-present
+
+      - name: Build
+        run: npm run build
+
+      - name: List the packed files
+        if: ${{ !inputs.release }}
+        run: npm pack --dry-run
+
+      - name: Check the tag matches the package version
+        if: ${{ inputs.release }}
+        run: |
+          set -euo pipefail
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version."
+            exit 1
+          fi
+
+      - id: pack
+        name: Pack
+        if: ${{ inputs.release }}
+        run: |
+          set -euo pipefail
+          file="$(npm pack 2>/dev/null | tail -n 1)"
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/attest-build-provenance@v4
+        if: ${{ inputs.release }}
+        with:
+          subject-path: ${{ steps.pack.outputs.file }}
+
+      - name: Publish the GitHub release
+        if: ${{ inputs.release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FILE: ${{ steps.pack.outputs.file }}
+        run: gh release create "$GITHUB_REF_NAME" "$FILE" --verify-tag --generate-notes
