@@ -37,7 +37,11 @@ jobs:
             selected=("${known[@]}")
           else
             for service in "${known[@]}"; do
-              git diff --quiet "$BASE_SHA" HEAD -- "$service" || selected+=("$service")
+              paths=("$service")
+              if [ -f "$service/.build-contexts" ]; then
+                mapfile -t -O 1 paths < <(sed -n 's/^[^=]*=//p' "$service/.build-contexts")
+              fi
+              git diff --quiet "$BASE_SHA" HEAD -- "${paths[@]}" || selected+=("$service")
             done
           fi
 

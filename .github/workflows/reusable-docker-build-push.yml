@@ -48,9 +48,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - id: contexts
+        env:
+          CONTEXTS_FILE: ${{ matrix.service }}/.build-contexts
+        run: |
+          set -euo pipefail
+          {
+            echo "value<<EOF"
+            if [ -f "$CONTEXTS_FILE" ]; then grep '=' "$CONTEXTS_FILE" || true; fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.service }}
+          build-contexts: ${{ steps.contexts.outputs.value }}
           push: ${{ inputs.push }}
           provenance: false
           tags: |
