@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           unpinned="$(grep -rhoE 'uses: [a-zA-Z0-9._-]+/[a-zA-Z0-9._/-]+@[^ ]+' .github/workflows \
-            | grep -vE '@v[0-9]+$' || true)"
+            | grep -vE '@v[0-9]+$' | grep -viE '^uses: project-graphite/actions/\.github/workflows/[^@]+@main$' || true)"
           if [ -n "$unpinned" ]; then
             echo "::error::Every action must be pinned to a major version tag."
             echo "$unpinned"
