@@ -47,6 +47,7 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 | `reusable-gitleaks.yml` | Scan full history for committed secrets |
 | `reusable-sync-registry.yml` | Validate this repository's manifest and ask the `platform` registry to resync it |
 | `reusable-package-release.yml` | Check an npm package repository, and on a version tag publish it as a GitHub release |
+| `reusable-changelog.yml` | Tag the next version from conventional commits and record its changelog entry in `graphite-hub` |
 
 ### reusable-detect-services
 

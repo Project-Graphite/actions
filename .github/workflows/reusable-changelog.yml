@@ -1,0 +1,75 @@
+name: Changelog
+
+on:
+  workflow_call:
+    secrets:
+      PLATFORM_APP_CLIENT_ID:
+        required: false
+      PLATFORM_APP_PRIVATE_KEY:
+        required: false
+
+jobs:
+  record:
+    name: Record
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ secrets.PLATFORM_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: graphite-hub,${{ github.event.repository.name }}
+          permission-contents: write
+
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/graphite-hub
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - run: npm ci
+        working-directory: site
+
+      - name: Tag a new version and draft its entries
+        working-directory: site
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: npm run sync:releases -- --cut "--repo=${REPOSITORY}"
+
+      - run: node scripts/compile.mjs
+        working-directory: site
+
+      - name: Record releases
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          git add releases
+          if git diff --cached --quiet; then
+            echo "No new releases for ${REPOSITORY}."
+            exit 0
+          fi
+
+          git config user.name "graphite-registry"
+          git config user.email "registry@project-graphite.com"
+          git commit --message "chore: record releases from ${REPOSITORY}"
+
+          for attempt in 1 2 3; do
+            if git pull --rebase --quiet origin main && git push origin HEAD:main; then
+              echo "Recorded releases from ${REPOSITORY}."
+              exit 0
+            fi
+            echo "Push raced with another release; retrying (${attempt}/3)."
+            sleep $(( attempt * 5 ))
+          done
+
+          echo "::error::Could not push the release records after 3 attempts."
+          exit 1
