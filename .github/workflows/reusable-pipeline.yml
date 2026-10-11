@@ -1,0 +1,98 @@
+name: Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      all:
+        type: boolean
+        default: false
+      checks:
+        type: boolean
+        default: true
+      deploy:
+        type: boolean
+        default: true
+      changelog:
+        type: boolean
+        default: true
+      secrets-scan:
+        type: boolean
+        default: true
+      conventions:
+        type: boolean
+        default: true
+      node-version:
+        type: string
+        default: "24"
+      python-version:
+        type: string
+        default: "3.14"
+    secrets:
+      PLATFORM_APP_CLIENT_ID:
+        required: false
+      PLATFORM_APP_PRIVATE_KEY:
+        required: false
+      COOLIFY_WEBHOOK:
+        required: false
+      COOLIFY_TOKEN:
+        required: false
+
+jobs:
+  services:
+    name: Detect
+    uses: project-graphite/actions/.github/workflows/reusable-detect-services.yml@main
+    with:
+      all: ${{ inputs.all }}
+
+  checks:
+    name: Checks
+    needs: services
+    if: ${{ inputs.checks }}
+    uses: project-graphite/actions/.github/workflows/reusable-checks.yml@main
+    with:
+      services: ${{ needs.services.outputs.services }}
+      node-version: ${{ inputs.node-version }}
+      python-version: ${{ inputs.python-version }}
+
+  images:
+    name: Images
+    needs: [services, checks]
+    if: ${{ !cancelled() && needs.services.result == 'success' && needs.checks.result != 'failure' }}
+    permissions:
+      contents: read
+      packages: write
+    uses: project-graphite/actions/.github/workflows/reusable-docker-build-push.yml@main
+    with:
+      services: ${{ needs.services.outputs.services }}
+      push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+  deploy:
+    name: Deploy
+    needs: [services, images]
+    if: ${{ !cancelled() && inputs.deploy && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.images.result == 'success' }}
+    uses: project-graphite/actions/.github/workflows/reusable-deploy.yml@main
+    with:
+      services: ${{ needs.services.outputs.services }}
+      tag: ${{ needs.images.outputs.tag }}
+    secrets: inherit
+
+  changelog:
+    name: Changelog
+    needs: [images, deploy]
+    if: ${{ !cancelled() && inputs.changelog && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.images.result == 'success' && needs.deploy.result != 'failure' }}
+    uses: project-graphite/actions/.github/workflows/reusable-changelog.yml@main
+    secrets: inherit
+
+  secrets:
+    name: Secrets
+    if: ${{ inputs.secrets-scan }}
+    uses: project-graphite/actions/.github/workflows/reusable-gitleaks.yml@main
+
+  conventions:
+    name: Conventions
+    if: ${{ inputs.conventions && github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    uses: project-graphite/actions/.github/workflows/reusable-pr-checks.yml@main

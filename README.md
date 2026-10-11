@@ -48,6 +48,18 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 | `reusable-sync-registry.yml` | Validate this repository's manifest and ask the `platform` registry to resync it |
 | `reusable-package-release.yml` | Check an npm package repository, and on a version tag publish it as a GitHub release |
 | `reusable-changelog.yml` | Tag the next version from conventional commits and record its changelog entry in `graphite-hub` |
+| `reusable-pipeline.yml` | Optional: the whole pull request and `main` pipeline above, with a boolean switch per stage |
+
+### reusable-pipeline
+
+| | |
+| :--- | :--- |
+| Inputs | `all` (`false`), `checks`, `deploy`, `changelog`, `secrets-scan`, `conventions` (all `true`), `node-version` (`24`), `python-version` (`3.14`) |
+| Secrets | `secrets: inherit` |
+| Caller permissions | `contents: read`, `packages: write`, `issues: write`, `pull-requests: write` |
+
+On a pull request it runs checks, an image build without push, gitleaks and conventions. On a push
+to `main` it runs checks, pushes the images, deploys, records the changelog and runs gitleaks.
 
 ### reusable-detect-services
 
@@ -121,8 +133,7 @@ a paid licence key for organisation repositories; the binary does not.
 Validates this repository's `.graphite.yml` with `platform`'s `scripts/sync.py`, against the
 schema and the current registry, and fails without dispatching when it is invalid. Otherwise it
 sends a `sync-registry` repository dispatch to `platform`, which rereads every `.graphite.yml` in
-the organisation. Call it on pushes to `main` that touch `.graphite.yml`; the registry also runs a
-daily reconcile for repositories that never call it and for renamed repositories.
+the organisation. Call it on pushes to `main` that touch `.graphite.yml`.
 
 It dispatches rather than calling the registry workflow directly because the deploy app holds
 `contents: write` but not `actions: write`.
