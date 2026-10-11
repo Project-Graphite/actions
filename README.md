@@ -42,7 +42,7 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 | `reusable-detect-services.yml` | Outputs the services changed in this event, as a JSON array |
 | `reusable-checks.yml` | Lint, test and build each changed service |
 | `reusable-docker-build-push.yml` | Build each changed service and push to GHCR |
-| `reusable-deploy.yml` | Record the new image tags in the `platform` repository |
+| `reusable-deploy.yml` | Trigger the Coolify deployment and record the new image tags in the `platform` repository |
 | `reusable-pr-checks.yml` | Diff-size label, path labels |
 | `reusable-gitleaks.yml` | Scan full history for committed secrets |
 | `reusable-sync-registry.yml` | Validate this repository's manifest and ask the `platform` registry to resync it |
@@ -79,11 +79,12 @@ per service, so one service rebuilding does not invalidate another.
 | | |
 | :--- | :--- |
 | Inputs | `services` (required), `tag` (required) |
-| Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY` |
+| Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY`, `COOLIFY_WEBHOOK`, `COOLIFY_TOKEN` |
 
-When `projects/<slug>.yml` in `platform` declares `deploy.kind: compose`, merges the new tags into
-`tags/<slug>.json` there and pushes to its `main`. Any other kind records nothing. It does not
-contact Coolify or mutate the VPS.
+When `projects/<slug>.yml` in `platform` declares `deploy.kind: compose`, sends an authenticated
+`POST` to `COOLIFY_WEBHOOK`, then merges the new tags into `tags/<slug>.json` there and pushes to
+its `main`. Without `COOLIFY_WEBHOOK` it records the tags and skips the deployment. Any other kind
+does nothing.
 
 It fails if `projects/<slug>.yml` does not exist in `platform` — a repository cannot deploy until
 it has a registry entry.
