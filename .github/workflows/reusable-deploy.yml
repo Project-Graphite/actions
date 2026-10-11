@@ -14,10 +14,6 @@ on:
         required: false
       PLATFORM_APP_PRIVATE_KEY:
         required: false
-      COOLIFY_WEBHOOK:
-        required: false
-      COOLIFY_TOKEN:
-        required: false
 
 jobs:
   deploy:
@@ -62,22 +58,6 @@ jobs:
 
           echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
           echo "kind=${kind}" >> "$GITHUB_OUTPUT"
-
-      - name: Trigger Coolify deployment
-        if: ${{ steps.entry.outputs.kind == 'compose' }}
-        env:
-          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "$COOLIFY_WEBHOOK" ]; then
-            echo "::notice::COOLIFY_WEBHOOK is not set in this repository; recording the tag without deploying."
-            exit 0
-          fi
-
-          curl --fail --show-error --silent --request POST "$COOLIFY_WEBHOOK" \
-            --header "Authorization: Bearer $COOLIFY_TOKEN"
 
       - name: Record tags
         if: ${{ steps.entry.outputs.kind == 'compose' || steps.entry.outputs.kind == 'pages' }}

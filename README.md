@@ -92,15 +92,11 @@ per service, so one service rebuilding does not invalidate another.
 | | |
 | :--- | :--- |
 | Inputs | `services` (required, e.g. `["app"]`, or `["site"]` for a static site), `tag` (default `sha-<short>` of the pushed commit) |
-| Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY`, `COOLIFY_WEBHOOK`, `COOLIFY_TOKEN` |
+| Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY` |
 
 When `projects/<slug>.yml` in `platform` declares `deploy.kind: compose` or `pages`, merges the new
 tags into `tags/<slug>.json` there and pushes to its `main`. That push runs the platform **Deploy**
 workflow. Any other kind does nothing.
-
-While a compose project still runs on Coolify, `COOLIFY_WEBHOOK` and `COOLIFY_TOKEN` in its
-repository make this workflow call Coolify too. Delete them once the project deploys from
-`platform`.
 
 It fails if `projects/<slug>.yml` does not exist in `platform` — a repository cannot deploy until
 it has a registry entry.
