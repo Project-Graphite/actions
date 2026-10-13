@@ -32,10 +32,6 @@ on:
         required: false
       PLATFORM_APP_PRIVATE_KEY:
         required: false
-      COOLIFY_WEBHOOK:
-        required: false
-      COOLIFY_TOKEN:
-        required: false
 
 jobs:
   services:
