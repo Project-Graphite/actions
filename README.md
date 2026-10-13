@@ -159,22 +159,6 @@ the `package.json` version, packs the package, attests the tarball's build prove
 the GitHub release with the tarball attached. Apps install that release asset by URL, so installs
 need no registry account or token.
 
-## vps-ssh
-
-A composite action that installs `cloudflared` and configures `ssh graphite` and `scp` to reach
-the VPS through Cloudflare Access. The platform **Deploy** workflow and the secrets repository use
-it.
-
-```yaml
-- uses: project-graphite/actions/vps-ssh@main
-  with:
-    host: ${{ vars.DEPLOY_SSH_HOST }}
-    key: ${{ secrets.DEPLOY_SSH_KEY }}
-    known-hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-    access-id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-    access-secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-```
-
 ## Versioning
 
 Call these workflows at `@main`:
