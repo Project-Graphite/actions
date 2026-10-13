@@ -8,7 +8,7 @@ on:
         required: true
       tag:
         type: string
-        required: true
+        default: ""
     secrets:
       PLATFORM_APP_CLIENT_ID:
         required: false
@@ -56,8 +56,8 @@ jobs:
           fi
 
           kind="$(python3 -c "import os,yaml;print(yaml.safe_load(open(f\"projects/{os.environ['SLUG']}.yml\"))['deploy']['kind'])")"
-          if [ "$kind" != "compose" ]; then
-            echo "Registry entry declares kind: ${kind}, which does not run container images."
+          if [ "$kind" != "compose" ] && [ "$kind" != "pages" ]; then
+            echo "Registry entry declares kind: ${kind}, which has nothing to deploy."
           fi
 
           echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
@@ -79,14 +79,15 @@ jobs:
           curl --fail --show-error --silent --request POST "$COOLIFY_WEBHOOK" \
             --header "Authorization: Bearer $COOLIFY_TOKEN"
 
-      - name: Record image tags
-        if: ${{ steps.entry.outputs.kind == 'compose' }}
+      - name: Record tags
+        if: ${{ steps.entry.outputs.kind == 'compose' || steps.entry.outputs.kind == 'pages' }}
         env:
           SERVICES: ${{ inputs.services }}
           TAG: ${{ inputs.tag }}
           SLUG: ${{ steps.entry.outputs.slug }}
         run: |
           set -euo pipefail
+          export TAG="${TAG:-sha-${GITHUB_SHA::7}}"
 
           python3 - <<'PY'
           import json, os, pathlib

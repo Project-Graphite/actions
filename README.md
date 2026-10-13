@@ -42,7 +42,7 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 | `reusable-detect-services.yml` | Outputs the services changed in this event, as a JSON array |
 | `reusable-checks.yml` | Lint, test and build each changed service |
 | `reusable-docker-build-push.yml` | Build each changed service and push to GHCR |
-| `reusable-deploy.yml` | Trigger the Coolify deployment and record the new image tags in the `platform` repository |
+| `reusable-deploy.yml` | Record the new image or site tag in `platform`, which deploys it |
 | `reusable-pr-checks.yml` | Diff-size label, path labels |
 | `reusable-gitleaks.yml` | Scan full history for committed secrets |
 | `reusable-sync-registry.yml` | Validate this repository's manifest and ask the `platform` registry to resync it |
@@ -91,13 +91,16 @@ per service, so one service rebuilding does not invalidate another.
 
 | | |
 | :--- | :--- |
-| Inputs | `services` (required), `tag` (required) |
+| Inputs | `services` (required, e.g. `["app"]`, or `["site"]` for a static site), `tag` (default `sha-<short>` of the pushed commit) |
 | Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY`, `COOLIFY_WEBHOOK`, `COOLIFY_TOKEN` |
 
-When `projects/<slug>.yml` in `platform` declares `deploy.kind: compose`, sends an authenticated
-`POST` to `COOLIFY_WEBHOOK`, then merges the new tags into `tags/<slug>.json` there and pushes to
-its `main`. Without `COOLIFY_WEBHOOK` it records the tags and skips the deployment. Any other kind
-does nothing.
+When `projects/<slug>.yml` in `platform` declares `deploy.kind: compose` or `pages`, merges the new
+tags into `tags/<slug>.json` there and pushes to its `main`. That push runs the platform **Deploy**
+workflow. Any other kind does nothing.
+
+While a compose project still runs on Coolify, `COOLIFY_WEBHOOK` and `COOLIFY_TOKEN` in its
+repository make this workflow call Coolify too. Delete them once the project deploys from
+`platform`.
 
 It fails if `projects/<slug>.yml` does not exist in `platform` — a repository cannot deploy until
 it has a registry entry.
@@ -173,7 +176,7 @@ A repository that needs to hold back can pin a commit SHA at the call site.
 ## Calling them
 
 See [project-template](https://github.com/project-graphite/project-template) for the workflow
-files every project repository needs: `main.yml`, `pr.yml` and `registry.yml`.
+files every project repository needs: `pipeline.yml` and `registry.yml`.
 
 ## Permissions
 
