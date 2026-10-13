@@ -25,6 +25,17 @@ change is needed.
 A single-service project still puts its code in a folder (`app/`, `api/`), not at the repository
 root. That keeps image names uniform: `ghcr.io/project-graphite/<repo>/<service>`.
 
+A service that builds from paths outside its folder lists them in `<service>/.build-contexts`, one
+`name=path` per line, relative to the repository root:
+
+```
+emulator=./gb-emulator
+```
+
+`reusable-detect-services` counts a change under a listed path as a change to the service, and
+`reusable-docker-build-push` passes each line as a named build context, which the `Dockerfile`
+reads with `COPY --from=emulator`.
+
 ## Per-service checks
 
 | Folder contains | Runs |
@@ -55,8 +66,10 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 | | |
 | :--- | :--- |
 | Inputs | `all` (`false`), `checks`, `deploy`, `changelog`, `secrets-scan`, `conventions` (all `true`), `node-version` (`24`), `python-version` (`3.14`) |
-| Secrets | `secrets: inherit` |
+| Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY` (optional; deploy and changelog need them) |
 | Caller permissions | `contents: read`, `packages: write`, `issues: write`, `pull-requests: write` |
+
+Call it with `secrets: inherit`, as `project-template` does, or pass the two secrets by name.
 
 On a pull request it runs checks, an image build without push, gitleaks and conventions. On a push
 to `main` it runs checks, pushes the images, deploys, records the changelog and runs gitleaks.
@@ -94,9 +107,10 @@ per service, so one service rebuilding does not invalidate another.
 | Inputs | `services` (required, e.g. `["app"]`, or `["site"]` for a static site), `tag` (default `sha-<short>` of the pushed commit) |
 | Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY` |
 
-When `projects/<slug>.yml` in `platform` declares `deploy.kind: compose` or `pages`, merges the new
-tags into `tags/<slug>.json` there and pushes to its `main`. That push runs the platform **Deploy**
-workflow. Any other kind does nothing.
+The slug is the calling repository's name in lower case, so `Graphite-Tracker` reads
+`projects/graphite-tracker.yml`. When that file in `platform` declares `deploy.kind: compose` or
+`pages`, merges the new tags into `tags/<slug>.json` there and pushes to its `main`. That push runs
+the platform **Deploy** workflow. Any other kind does nothing.
 
 It fails if `projects/<slug>.yml` does not exist in `platform` — a repository cannot deploy until
 it has a registry entry.
@@ -134,8 +148,8 @@ schema and the current registry, and fails without dispatching when it is invali
 sends a `sync-registry` repository dispatch to `platform`, which rereads every `.graphite.yml` in
 the organisation. Call it on pushes to `main` that touch `.graphite.yml`.
 
-It dispatches rather than calling the registry workflow directly because the deploy app holds
-`contents: write` but not `actions: write`.
+It dispatches rather than calling the registry workflow directly because the platform GitHub App
+(`PLATFORM_APP_*`) holds `contents: write` but not `actions: write`.
 
 ### reusable-package-release
 
@@ -154,6 +168,17 @@ With `release: true`, call it from a workflow triggered by a `v*` tag. It checks
 the `package.json` version, packs the package, attests the tarball's build provenance, and creates
 the GitHub release with the tarball attached. Apps install that release asset by URL, so installs
 need no registry account or token.
+
+### reusable-changelog
+
+| | |
+| :--- | :--- |
+| Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY` |
+
+Runs `graphite-hub`'s release sync for the calling repository: it tags the next version from the
+conventional commits since the last tag, then commits the drafted entries under `releases/` to
+`graphite-hub`'s `main`. The platform GitHub App's token needs `contents: write` on `graphite-hub`
+and on the calling repository, which receives the tag.
 
 ## Versioning
 
