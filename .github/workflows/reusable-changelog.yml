@@ -36,12 +36,30 @@ jobs:
       - run: npm ci
         working-directory: site
 
+      - name: List the tags before
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: gh api "repos/${REPOSITORY}/tags" --paginate --jq '.[].name' | sort > "${RUNNER_TEMP}/tags-before"
+
       - name: Tag a new version and draft its entries
         working-directory: site
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
         run: npm run sync:releases -- --cut "--repo=${REPOSITORY}"
+
+      - name: Publish a GitHub release for each new tag
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${REPOSITORY}/tags" --paginate --jq '.[].name' | sort > "${RUNNER_TEMP}/tags-after"
+          comm -13 "${RUNNER_TEMP}/tags-before" "${RUNNER_TEMP}/tags-after" | while read -r tag; do
+            gh release create "$tag" --repo "$REPOSITORY" --verify-tag --generate-notes --title "$tag"
+            echo "Published the ${tag} release."
+          done
 
       - run: node scripts/compile.mjs
         working-directory: site

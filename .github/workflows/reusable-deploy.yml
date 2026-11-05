@@ -59,32 +59,34 @@ jobs:
           echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
           echo "kind=${kind}" >> "$GITHUB_OUTPUT"
 
-      - name: Record tags
+      - name: Record the image tag
         if: ${{ steps.entry.outputs.kind == 'compose' || steps.entry.outputs.kind == 'pages' }}
         env:
-          SERVICES: ${{ inputs.services }}
           TAG: ${{ inputs.tag }}
           SLUG: ${{ steps.entry.outputs.slug }}
         run: |
           set -euo pipefail
           export TAG="${TAG:-sha-${GITHUB_SHA::7}}"
 
-          python3 - <<'PY'
-          import json, os, pathlib
+          if [ ! -d "deploy/${SLUG}" ]; then
+            echo "No deploy/${SLUG}/ in the platform repository, so ${SLUG} is not deployed; nothing to record."
+            exit 0
+          fi
 
-          path = pathlib.Path("tags") / f"{os.environ['SLUG']}.json"
-          path.parent.mkdir(exist_ok=True)
-          tags = json.loads(path.read_text()) if path.exists() else {}
-          tags.update(dict.fromkeys(json.loads(os.environ["SERVICES"]), os.environ["TAG"]))
-          path.write_text(json.dumps(tags, indent=2, sort_keys=True) + "\n")
+          python3 - <<'PY'
+          import os, pathlib
+
+          path = pathlib.Path("deploy") / os.environ["SLUG"] / "values"
+          lines = [line for line in (path.read_text().splitlines() if path.exists() else []) if not line.startswith("IMAGE_TAG=")]
+          path.write_text("\n".join([f"IMAGE_TAG={os.environ['TAG']}", *lines]) + "\n")
           PY
 
           git config user.name "graphite-deploy"
           git config user.email "deploy@project-graphite.com"
-          git add "tags/${SLUG}.json"
+          git add "deploy/${SLUG}/values"
 
           if git diff --cached --quiet; then
-            echo "Tags already at ${TAG}; nothing to record."
+            echo "IMAGE_TAG is already ${TAG}; nothing to record."
             exit 0
           fi
 
