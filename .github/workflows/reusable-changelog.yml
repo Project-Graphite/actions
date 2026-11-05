@@ -19,7 +19,7 @@ jobs:
           client-id: ${{ secrets.PLATFORM_APP_CLIENT_ID }}
           private-key: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: graphite-hub,${{ github.event.repository.name }}
+          repositories: graphite-hub,platform,${{ github.event.repository.name }}
           permission-contents: write
 
       - uses: actions/checkout@v7
@@ -42,7 +42,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: gh api "repos/${REPOSITORY}/tags" --paginate --jq '.[].name' | sort > "${RUNNER_TEMP}/tags-before"
 
-      - name: Tag a new version and draft its entries
+      - name: Tag the next version
         working-directory: site
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -60,34 +60,3 @@ jobs:
             gh release create "$tag" --repo "$REPOSITORY" --verify-tag --generate-notes --title "$tag"
             echo "Published the ${tag} release."
           done
-
-      - run: node scripts/compile.mjs
-        working-directory: site
-
-      - name: Record releases
-        env:
-          REPOSITORY: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-
-          git add releases
-          if git diff --cached --quiet; then
-            echo "No new releases for ${REPOSITORY}."
-            exit 0
-          fi
-
-          git config user.name "graphite-registry"
-          git config user.email "registry@project-graphite.com"
-          git commit --message "chore: record releases from ${REPOSITORY}"
-
-          for attempt in 1 2 3; do
-            if git pull --rebase --quiet origin main && git push origin HEAD:main; then
-              echo "Recorded releases from ${REPOSITORY}."
-              exit 0
-            fi
-            echo "Push raced with another release; retrying (${attempt}/3)."
-            sleep $(( attempt * 5 ))
-          done
-
-          echo "::error::Could not push the release records after 3 attempts."
-          exit 1
