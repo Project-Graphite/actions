@@ -3,8 +3,8 @@
 Reusable GitHub Actions workflows called by Project Graphite repositories.
 
 Project repositories call the workflows here for service detection, checks, image builds, deploy
-records, registry sync, PR conventions and secret scanning, so each step is defined in one place
-and changes to it land once.
+records, releases, PR conventions and secret scanning, so each step is defined in one place and
+changes to it land once.
 
 ## The service convention
 
@@ -53,13 +53,16 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 | `reusable-detect-services.yml` | Outputs the services changed in this event, as a JSON array |
 | `reusable-checks.yml` | Lint, test and build each changed service |
 | `reusable-docker-build-push.yml` | Build each changed service and push to GHCR |
-| `reusable-deploy.yml` | Record the new image or site tag in `platform`, which deploys it |
+| `reusable-deploy.yml` | Write the new image tag into `platform`, which deploys it |
 | `reusable-pr-checks.yml` | Diff-size label, path labels |
 | `reusable-gitleaks.yml` | Scan full history for committed secrets |
-| `reusable-sync-registry.yml` | Validate this repository's manifest and ask the `platform` registry to resync it |
 | `reusable-package-release.yml` | Check an npm package repository, and on a version tag publish it as a GitHub release |
-| `reusable-changelog.yml` | Tag the next version from conventional commits and record its changelog entry in `graphite-hub` |
+| `reusable-changelog.yml` | Tag the next version from conventional commits and publish it as a GitHub Release |
 | `reusable-pipeline.yml` | Optional: the whole pull request and `main` pipeline above, with a boolean switch per stage |
+
+There is no registry workflow any more. The Hub receives the organisation webhook, and a push that
+changes a repository's `.graphite.yml` makes it dispatch `platform`'s **Sync registry**; a
+`registry.yml` in a project repository is dead and can be deleted.
 
 ### reusable-pipeline
 
@@ -72,7 +75,7 @@ A `Makefile` service owns its own environment setup. CI does not guess at pip, p
 Call it with `secrets: inherit`, as `project-template` does, or pass the two secrets by name.
 
 On a pull request it runs checks, an image build without push, gitleaks and conventions. On a push
-to `main` it runs checks, pushes the images, deploys, records the changelog and runs gitleaks.
+to `main` it runs checks, pushes the images, deploys, publishes the release and runs gitleaks.
 
 ### reusable-detect-services
 
@@ -109,8 +112,10 @@ per service, so one service rebuilding does not invalidate another.
 
 The slug is the calling repository's name in lower case, so `Graphite-Tracker` reads
 `projects/graphite-tracker.yml`. When that file in `platform` declares `deploy.kind: compose` or
-`pages`, merges the new tags into `tags/<slug>.json` there and pushes to its `main`. That push runs
-the platform **Deploy** workflow. Any other kind does nothing.
+`pages` and `deploy/<slug>/` exists there, it writes `IMAGE_TAG=<tag>` as the first line of
+`deploy/<slug>/values`, commits `chore(<slug>): deploy <tag>` and pushes to `main`, retrying a
+race with another deploy three times. That push runs the platform **Deploy** workflow. Any other
+kind, or no deploy folder, records nothing.
 
 It fails if `projects/<slug>.yml` does not exist in `platform` — a repository cannot deploy until
 it has a registry entry.
@@ -137,20 +142,6 @@ labels.
 Runs the pinned release binary against full history. The `gitleaks-action` marketplace action needs
 a paid licence key for organisation repositories; the binary does not.
 
-### reusable-sync-registry
-
-| | |
-| :--- | :--- |
-| Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY` |
-
-Validates this repository's `.graphite.yml` with `platform`'s `scripts/sync.py`, against the
-schema and the current registry, and fails without dispatching when it is invalid. Otherwise it
-sends a `sync-registry` repository dispatch to `platform`, which rereads every `.graphite.yml` in
-the organisation. Call it on pushes to `main` that touch `.graphite.yml`.
-
-It dispatches rather than calling the registry workflow directly because the platform GitHub App
-(`PLATFORM_APP_*`) holds `contents: write` but not `actions: write`.
-
 ### reusable-package-release
 
 | | |
@@ -175,10 +166,12 @@ need no registry account or token.
 | :--- | :--- |
 | Secrets | `PLATFORM_APP_CLIENT_ID`, `PLATFORM_APP_PRIVATE_KEY` |
 
-Runs `graphite-hub`'s release sync for the calling repository: it tags the next version from the
-conventional commits since the last tag, then commits the drafted entries under `releases/` to
-`graphite-hub`'s `main`. The platform GitHub App's token needs `contents: write` on `graphite-hub`
-and on the calling repository, which receives the tag.
+Checks out `graphite-hub` and runs its `npm run sync:releases -- --cut` for the calling
+repository: it reads the listed projects from `platform/projects/`, tags the next version from the
+conventional commits since the last tag (`v1.2.0`, or `<slug>/v1.2.0` for a project inside an
+epic), and publishes a GitHub Release with generated notes for each new tag. The Hub records the
+release from the organisation webhook. The platform GitHub App's token needs `contents: write` on
+`graphite-hub`, `platform` and the calling repository, which receives the tag and the release.
 
 ## Versioning
 
@@ -196,8 +189,8 @@ A repository that needs to hold back can pin a commit SHA at the call site.
 
 ## Calling them
 
-See [project-template](https://github.com/project-graphite/project-template) for the workflow
-files every project repository needs: `pipeline.yml` and `registry.yml`.
+See [project-template](https://github.com/project-graphite/project-template) for the one workflow
+file every project repository needs: `pipeline.yml`.
 
 ## Permissions
 
